@@ -81,21 +81,55 @@
   .db-bar {
     position: relative;
     z-index: 1;
-    background: linear-gradient(180deg, #ffa64d 0%, #ff8a2b 30%, #e8580a 62%, #b33c00 100%);
-    border: 4px solid #3a1600;
-    border-radius: 20px;
-    padding: 26px 28px 16px;
+    background: linear-gradient(180deg, #ffb85c 0%, #ff8a2b 28%, #e8580a 60%, #a83300 100%);
+    border: 4px solid #2a0f00;
+    border-radius: 14px 26px 14px 26px;
+    padding: 26px 30px 16px;
     box-shadow:
-      inset 0 3px 5px rgba(255,255,255,0.45),
-      inset 0 -10px 16px rgba(0,0,0,0.4),
-      0 0 0 2px rgba(255,200,120,0.25);
+      inset 0 3px 5px rgba(255,255,255,0.5),
+      inset 0 -12px 18px rgba(0,0,0,0.45),
+      0 0 0 2px rgba(255,205,130,0.35),
+      0 0 0 5px rgba(58,20,0,0.3);
+    overflow: hidden;
+  }
+  .db-bar::before {
+    content: "";
+    position: absolute;
+    inset: 6px;
+    border-radius: 10px 22px 10px 22px;
+    border: 1.5px solid rgba(255,224,160,0.55);
+    pointer-events: none;
+    z-index: 2;
+  }
+  .db-bar::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      118deg, rgba(255,255,255,0.07) 0 3px, transparent 3px 26px);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .db-bar > * { position: relative; z-index: 3; }
+
+  .db-flame {
+    width: 26px;
+    height: 30px;
+    flex-shrink: 0;
+    filter: drop-shadow(0 0 4px rgba(255,140,0,0.8));
   }
 
   .db-titles {
     display: flex;
     justify-content: space-between;
-    align-items: baseline;
+    align-items: center;
+    gap: 10px;
     margin-bottom: 10px;
+  }
+  .db-title-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 
   .db-goal-title {
@@ -255,7 +289,19 @@
     <div class="db-balls" id="balls"></div>
     <div class="db-bar" id="bar">
       <div class="db-titles">
-        <div class="db-goal-title">CEL: LAPTOP</div>
+        <div class="db-title-group">
+          <svg class="db-flame" viewBox="0 0 40 46" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 2C14 10 8 14 8 24a12 12 0 0 0 24 0c0-6-3-9-5-12 0 5-3 7-5 7 2-6-1-12-2-17z" fill="url(#flameGrad)" stroke="#7a1e00" stroke-width="1.4"/>
+            <defs>
+              <linearGradient id="flameGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#fff3b0"/>
+                <stop offset="45%" stop-color="#ffb400"/>
+                <stop offset="100%" stop-color="#ff4d00"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <div class="db-goal-title" id="goalTitle">CEL: LAPTOP</div>
+        </div>
         <div class="db-amounts">
           <span id="current">0 zł</span><span class="sep">/</span><span id="goal-text">500 zł</span>
         </div>
@@ -272,9 +318,11 @@
   </div>
 
   <div class="edit-panel" id="editPanel">
+    <label>Nazwa celu:</label>
+    <input type="text" id="editTitle" style="width:140px">
     <label>Kwota (zł):</label>
     <input type="number" id="editAmount" min="0" step="1">
-    <label>Cel (zł):</label>
+    <label>Do zebrania (zł):</label>
     <input type="number" id="editGoal" min="1" step="1">
     <button id="editSave">Zapisz</button>
     <span id="editStatus"></span>
@@ -287,10 +335,22 @@
   const GOAL_CONFIG = {
     goal: 500,
     amount: 0,
+    title: 'LAPTOP',
     ballsCount: 7,
     amountKey: 'db_donate_current',
-    goalKey: 'db_donate_goal'
+    goalKey: 'db_donate_goal',
+    titleKey: 'db_donate_title'
   };
+
+  function readText(param, storageKey, fallback) {
+    const params = new URLSearchParams(location.search);
+    if (params.has(param)) {
+      const v = params.get(param).trim();
+      if (v) { localStorage.setItem(storageKey, v); return v; }
+    }
+    const stored = localStorage.getItem(storageKey);
+    return stored !== null ? stored : fallback;
+  }
 
   // Ukladu gwiazdek na kazdej kuli (1-7), wspolrzedne wzgledem srodka 40,40 w viewBoxie 0 0 80 80
   const STAR_LAYOUTS = {
@@ -394,19 +454,25 @@
 
   let currentAmount = readValue('amount', GOAL_CONFIG.amountKey, GOAL_CONFIG.amount);
   let currentGoal = readValue('goal', GOAL_CONFIG.goalKey, GOAL_CONFIG.goal);
+  let currentTitle = readText('title', GOAL_CONFIG.titleKey, GOAL_CONFIG.title);
+  document.getElementById('goalTitle').textContent = 'CEL: ' + currentTitle.toUpperCase();
   updateDisplay(currentAmount, currentGoal);
 
   // Panel edycji: dodaj ?edit=1 do adresu, zeby go pokazac
   if (new URLSearchParams(location.search).get('edit') === '1') {
     const panel = document.getElementById('editPanel');
     panel.classList.add('show');
+    const titleInput = document.getElementById('editTitle');
     const amountInput = document.getElementById('editAmount');
     const goalInput = document.getElementById('editGoal');
+    titleInput.value = currentTitle;
     amountInput.value = currentAmount;
     goalInput.value = currentGoal;
     document.getElementById('editSave').addEventListener('click', () => {
+      const t = titleInput.value.trim();
       const a = parseFloat(amountInput.value);
       const g = parseFloat(goalInput.value);
+      if (t) { currentTitle = t; localStorage.setItem(GOAL_CONFIG.titleKey, t); document.getElementById('goalTitle').textContent = 'CEL: ' + t.toUpperCase(); }
       if (!isNaN(a)) { currentAmount = a; localStorage.setItem(GOAL_CONFIG.amountKey, String(a)); }
       if (!isNaN(g) && g > 0) { currentGoal = g; localStorage.setItem(GOAL_CONFIG.goalKey, String(g)); }
       updateDisplay(currentAmount, currentGoal);

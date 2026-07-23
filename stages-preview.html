@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<title>Podgląd etapów</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #1c1c1c;
+    font-family: 'Arial Black', Arial, sans-serif;
+  }
+  .stage-row {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding: 18px 24px;
+    border-bottom: 1px solid #333;
+  }
+  .stage-label {
+    width: 70px;
+    color: #aaa;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .db-wrap { width: 720px; position: relative; filter: drop-shadow(0 10px 18px rgba(0,0,0,0.6)); transform: scale(0.85); transform-origin: left center; }
+  .db-aura {
+    position: absolute; inset: -40px -20px -20px;
+    background: radial-gradient(ellipse at 50% 60%, rgba(255,170,30,0.55) 0%, rgba(255,140,0,0.22) 40%, transparent 72%);
+    filter: blur(6px); z-index: 0; pointer-events: none;
+  }
+  .db-balls { display: flex; justify-content: space-between; padding: 0 18px; margin-bottom: -18px; position: relative; z-index: 3; }
+  .db-ball { width: 58px; height: 58px; opacity: 0.32; filter: grayscale(0.65) brightness(0.55); transform: scale(0.8); }
+  .db-ball svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .db-ball.lit { opacity: 1; filter: grayscale(0) brightness(1) drop-shadow(0 0 10px rgba(255,170,0,0.9)); transform: scale(1.08); }
+  .db-bar {
+    position: relative; z-index: 1;
+    background: linear-gradient(180deg, #ffa64d 0%, #ff8a2b 30%, #e8580a 62%, #b33c00 100%);
+    border: 4px solid #3a1600; border-radius: 20px; padding: 26px 28px 16px;
+    box-shadow: inset 0 3px 5px rgba(255,255,255,0.45), inset 0 -10px 16px rgba(0,0,0,0.4), 0 0 0 2px rgba(255,200,120,0.25);
+  }
+  .db-bar.complete {
+    animation: complete-glow 1.6s ease-in-out infinite;
+  }
+  @keyframes complete-glow {
+    0%, 100% { box-shadow: inset 0 2px 4px rgba(255,255,255,0.35), inset 0 -8px 14px rgba(0,0,0,0.35), 0 0 10px 2px rgba(255,220,80,0.5); }
+    50%      { box-shadow: inset 0 2px 4px rgba(255,255,255,0.35), inset 0 -8px 14px rgba(0,0,0,0.35), 0 0 26px 8px rgba(255,220,80,0.95); }
+  }
+  .db-titles { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  .db-goal-title {
+    font-size: 32px; font-style: italic; letter-spacing: 1px;
+    background: linear-gradient(180deg, #fff8e0 0%, #ffd558 55%, #ff9f1c 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    -webkit-text-stroke: 2px #4a1800;
+    filter: drop-shadow(2px 2px 0 #4a1800) drop-shadow(-2px 2px 0 #4a1800) drop-shadow(0 3px 4px rgba(0,0,0,0.5));
+  }
+  .db-amounts { font-family: ui-monospace, Consolas, 'Courier New', monospace; font-size: 20px; font-weight: 700; color: #fff2cf; text-shadow: 0 2px 3px rgba(0,0,0,0.6); }
+  .db-amounts .cur { color: #fff; }
+  .db-amounts .sep { opacity: .7; margin: 0 4px; }
+  .db-amounts .goaltxt { color: #ffe08a; }
+  .db-track { position: relative; height: 26px; background: #2b1300; border-radius: 13px; box-shadow: inset 0 3px 6px rgba(0,0,0,0.7); overflow: hidden; }
+  .db-fill { position: absolute; inset: 0; border-radius: 13px; background: linear-gradient(90deg, #ffdd55, #ff9a1f 60%, #ff6a00); box-shadow: 0 0 12px 2px rgba(255,180,40,0.85); }
+  .db-percent { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: ui-monospace, Consolas, 'Courier New', monospace; font-size: 14px; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.9); letter-spacing: 1px; z-index: 2; }
+  .db-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+  .db-caption { font-size: 13px; letter-spacing: 1px; color: #ffe4b3; opacity: 0.9; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
+  .db-channel { display: inline-flex; align-items: center; gap: 6px; background: #0c0c0c; border: 2px solid #53fc18; border-radius: 20px; padding: 5px 14px; font-size: 14px; color: #53fc18; text-shadow: 0 0 6px rgba(83,252,24,0.6); }
+  .db-channel .dot { width: 8px; height: 8px; border-radius: 50%; background: #53fc18; box-shadow: 0 0 6px 2px rgba(83,252,24,0.9); }
+</style>
+</head>
+<body id="stages">
+<script>
+  const GOAL = 500;
+  const BALLS = 7;
+
+  const STAR_LAYOUTS = {
+    1: [[0, 0]],
+    2: [[-9, -9], [9, 9]],
+    3: [[0, -11], [-10, 8], [10, 8]],
+    4: [[-10, -10], [10, -10], [-10, 10], [10, 10]],
+    5: [[0, -13], [-12, -3], [12, -3], [-7, 12], [7, 12]],
+    6: [[-11, -11], [11, -11], [-14, 0], [14, 0], [-11, 11], [11, 11]],
+    7: [[0, -14], [-11, -8], [11, -8], [-13, 4], [13, 4], [-7, 13], [7, 13]]
+  };
+  function starPath(cx, cy, s) {
+    return `M${cx},${cy - s} C${cx + s * 0.18},${cy - s * 0.22} ${cx + s * 0.22},${cy - s * 0.18} ${cx + s},${cy} ` +
+           `C${cx + s * 0.22},${cy + s * 0.18} ${cx + s * 0.18},${cy + s * 0.22} ${cx},${cy + s} ` +
+           `C${cx - s * 0.18},${cy + s * 0.22} ${cx - s * 0.22},${cy + s * 0.18} ${cx - s},${cy} ` +
+           `C${cx - s * 0.22},${cy - s * 0.18} ${cx - s * 0.18},${cy - s * 0.22} ${cx},${cy - s} Z`;
+  }
+  function buildBallSVG(n, uid) {
+    const stars = (STAR_LAYOUTS[n] || STAR_LAYOUTS[1]).map(([dx, dy]) =>
+      `<path d="${starPath(40 + dx, 40 + dy, 5.4)}" fill="#e21f1f" stroke="#7a0000" stroke-width="0.6"/>`
+    ).join('');
+    return `
+      <svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="g${uid}" cx="35%" cy="30%" r="78%">
+            <stop offset="0%" stop-color="#fffdf0"/>
+            <stop offset="14%" stop-color="#ffe27a"/>
+            <stop offset="34%" stop-color="#ff9f1c"/>
+            <stop offset="62%" stop-color="#f8760a"/>
+            <stop offset="85%" stop-color="#d85400"/>
+            <stop offset="100%" stop-color="#9c3d00"/>
+          </radialGradient>
+          <radialGradient id="s${uid}" cx="68%" cy="78%" r="55%">
+            <stop offset="0%" stop-color="#5a2200" stop-opacity="0.55"/>
+            <stop offset="100%" stop-color="#5a2200" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <circle cx="40" cy="40" r="36" fill="url(#g${uid})" stroke="#6b3400" stroke-width="1.6"/>
+        <circle cx="40" cy="40" r="36" fill="url(#s${uid})"/>
+        <ellipse cx="26" cy="21" rx="15" ry="9" fill="#ffffff" opacity="0.65"/>
+        <ellipse cx="21" cy="16" rx="5" ry="3" fill="#ffffff" opacity="0.85"/>
+        ${stars}
+      </svg>`;
+  }
+
+  function buildStage(amount, uidBase) {
+    const percent = Math.min(100, (amount / GOAL) * 100);
+    const step = GOAL / BALLS;
+    const complete = percent >= 100;
+
+    let balls = '';
+    for (let i = 1; i <= BALLS; i++) {
+      const lit = amount >= i * step;
+      balls += `<div class="db-ball ${lit ? 'lit' : ''}">${buildBallSVG(i, uidBase + '-' + i)}</div>`;
+    }
+
+    const caption = complete ? 'SMOK ZOSTAŁ PRZYWOŁANY! DZIĘKI ZA WSPARCIE!' : 'ZBIERAM SMOCZE KULE, WESPRZYJ!';
+
+    return `
+      <div class="db-wrap">
+        <div class="db-aura"></div>
+        <div class="db-balls">${balls}</div>
+        <div class="db-bar ${complete ? 'complete' : ''}">
+          <div class="db-titles">
+            <div class="db-goal-title">CEL: LAPTOP</div>
+            <div class="db-amounts"><span class="cur">${amount} zł</span><span class="sep">/</span><span class="goaltxt">${GOAL} zł</span></div>
+          </div>
+          <div class="db-track">
+            <div class="db-fill" style="width:${percent}%"></div>
+            <div class="db-percent">${Math.round(percent)}%</div>
+          </div>
+          <div class="db-footer">
+            <div class="db-caption">${caption}</div>
+            <div class="db-channel"><span class="dot"></span>kick.com/krakowiakv2</div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  const stops = [0, 72, 143, 215, 286, 358, 429, 500];
+  const root = document.getElementById('stages');
+  stops.forEach((amount, i) => {
+    const row = document.createElement('div');
+    row.className = 'stage-row';
+    row.innerHTML = `<div class="stage-label">${i}/7 kul<br>${Math.round(amount/GOAL*100)}%</div>` + buildStage(amount, 'u' + i);
+    root.appendChild(row);
+  });
+</script>
+</body>
+</html>

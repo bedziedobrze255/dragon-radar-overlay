@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<title>Top Wspierający - Smocze Kule</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  /* ============================================================
+     KONFIGURACJA
+     Lista ustawiana przez adres URL: imie + kwota dla max 5 osob
+       top-donators.html?n1=Jan&a1=250&n2=Kasia&a2=180&n3=Michal&a3=90
+     Albo recznie: top-donators.html?edit=1 (panel z polami)
+     Najlatwiej wygenerowac link w panel.html (panel sterowania).
+  ============================================================ */
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: transparent;
+    width: 100%; height: 100%;
+    font-family: 'Arial Black', Arial, sans-serif;
+    overflow: hidden;
+  }
+
+  .tw-wrap {
+    width: 420px;
+    margin: 24px;
+    position: relative;
+    filter: drop-shadow(0 10px 18px rgba(0,0,0,0.6));
+  }
+
+  .tw-aura {
+    position: absolute;
+    inset: -30px -20px -20px;
+    background: radial-gradient(ellipse at 50% 10%, rgba(255,170,30,0.5) 0%, rgba(255,140,0,0.18) 45%, transparent 75%);
+    filter: blur(6px);
+    animation: aura-pulse 3s ease-in-out infinite;
+    z-index: 0;
+    pointer-events: none;
+  }
+  @keyframes aura-pulse {
+    0%, 100% { opacity: 0.7; transform: scale(1); }
+    50%      { opacity: 1; transform: scale(1.03); }
+  }
+
+  .tw-panel {
+    position: relative;
+    z-index: 1;
+    background: linear-gradient(180deg, #ffb85c 0%, #ff8a2b 22%, #e8580a 55%, #a83300 100%);
+    border: 4px solid #2a0f00;
+    border-radius: 14px 26px 14px 26px;
+    padding: 18px 20px 16px;
+    box-shadow:
+      inset 0 3px 5px rgba(255,255,255,0.5),
+      inset 0 -12px 18px rgba(0,0,0,0.45),
+      0 0 0 2px rgba(255,205,130,0.35),
+      0 0 0 5px rgba(58,20,0,0.3);
+    overflow: hidden;
+  }
+  .tw-panel::before {
+    content: "";
+    position: absolute;
+    inset: 6px;
+    border-radius: 10px 22px 10px 22px;
+    border: 1.5px solid rgba(255,224,160,0.55);
+    pointer-events: none;
+    z-index: 2;
+  }
+  .tw-panel::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(118deg, rgba(255,255,255,0.07) 0 3px, transparent 3px 26px);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .tw-panel > * { position: relative; z-index: 3; }
+
+  .tw-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .tw-flame { width: 22px; height: 26px; flex-shrink: 0; filter: drop-shadow(0 0 4px rgba(255,140,0,0.8)); }
+  .tw-title {
+    font-size: 22px;
+    letter-spacing: 1px;
+    background: linear-gradient(180deg, #fff8e0 0%, #ffd558 55%, #ff9f1c 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    -webkit-text-stroke: 1.6px #4a1800;
+    filter: drop-shadow(1.5px 1.5px 0 #4a1800) drop-shadow(-1.5px 1.5px 0 #4a1800) drop-shadow(0 2px 3px rgba(0,0,0,0.5));
+  }
+
+  .tw-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .tw-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0,0,0,0.28);
+    border: 1.5px solid rgba(0,0,0,0.4);
+    border-radius: 10px;
+    padding: 7px 12px;
+  }
+  .tw-row.rank-1 { background: rgba(255, 215, 0, 0.22); border-color: rgba(255,215,0,0.55); }
+  .tw-row.rank-2 { background: rgba(220, 220, 230, 0.18); border-color: rgba(220,220,230,0.5); }
+  .tw-row.rank-3 { background: rgba(205, 127, 50, 0.22); border-color: rgba(205,127,50,0.55); }
+
+  .tw-rank {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+    color: #3a1600;
+    background: radial-gradient(circle at 32% 28%, #fff3c9, #ffb400 45%, #d85400 85%, #9c3d00 100%);
+    box-shadow: inset 0 2px 3px rgba(255,255,255,0.6), 0 0 6px rgba(255,170,0,0.7);
+    border: 1.5px solid #6b3400;
+  }
+  .tw-row.rank-1 .tw-rank { background: radial-gradient(circle at 32% 28%, #fffde8, #ffe14d 45%, #d8a300 85%, #8a6a00 100%); box-shadow: inset 0 2px 3px rgba(255,255,255,0.8), 0 0 10px rgba(255,215,0,0.9); }
+  .tw-row.rank-2 .tw-rank { background: radial-gradient(circle at 32% 28%, #ffffff, #d8d8e0 45%, #a0a0ad 85%, #6a6a75 100%); box-shadow: inset 0 2px 3px rgba(255,255,255,0.8), 0 0 8px rgba(210,210,220,0.8); }
+  .tw-row.rank-3 .tw-rank { background: radial-gradient(circle at 32% 28%, #ffdcb0, #cd7f32 45%, #9a5c22 85%, #5e3712 100%); box-shadow: inset 0 2px 3px rgba(255,255,255,0.6), 0 0 8px rgba(205,127,50,0.8); }
+
+  .tw-name {
+    flex: 1;
+    font-size: 15px;
+    color: #fff2cf;
+    text-shadow: 0 2px 3px rgba(0,0,0,0.6);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tw-amount {
+    font-family: ui-monospace, Consolas, 'Courier New', monospace;
+    font-size: 15px;
+    font-weight: 700;
+    color: #ffe08a;
+    text-shadow: 0 2px 3px rgba(0,0,0,0.6);
+    flex-shrink: 0;
+  }
+
+  .tw-footer {
+    display: flex;
+    justify-content: center;
+    margin-top: 14px;
+  }
+  .tw-channel {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #0c0c0c;
+    border: 2px solid #53fc18;
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 13px;
+    color: #53fc18;
+    text-shadow: 0 0 6px rgba(83,252,24,0.6);
+  }
+  .tw-channel .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #53fc18;
+    box-shadow: 0 0 6px 2px rgba(83,252,24,0.9);
+    animation: dot-blink 1.4s ease-in-out infinite;
+  }
+  @keyframes dot-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  .tw-empty {
+    text-align: center;
+    color: #ffe4b3;
+    font-size: 13px;
+    padding: 10px;
+    opacity: 0.85;
+  }
+
+  /* --- Panel edycji (?edit=1) --- */
+  .edit-panel {
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    width: 420px;
+    margin: 10px 0 0;
+    background: rgba(0,0,0,0.8);
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: #fff;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px;
+  }
+  .edit-panel.show { display: flex; }
+  .edit-panel .er { display: flex; gap: 6px; }
+  .edit-panel input { flex: 1; padding: 4px 6px; border-radius: 5px; border: none; font-family: inherit; }
+  .edit-panel button {
+    margin-top: 6px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: none;
+    background: #ffcf40;
+    color: #3a2200;
+    font-weight: bold;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+  <div class="tw-wrap">
+    <div class="tw-aura"></div>
+    <div class="tw-panel">
+      <div class="tw-title-row">
+        <svg class="tw-flame" viewBox="0 0 40 46" xmlns="http://www.w3.org/2000/svg">
+          <path d="M20 2C14 10 8 14 8 24a12 12 0 0 0 24 0c0-6-3-9-5-12 0 5-3 7-5 7 2-6-1-12-2-17z" fill="url(#flameGrad)" stroke="#7a1e00" stroke-width="1.4"/>
+          <defs>
+            <linearGradient id="flameGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#fff3b0"/>
+              <stop offset="45%" stop-color="#ffb400"/>
+              <stop offset="100%" stop-color="#ff4d00"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <div class="tw-title">TOP WOJOWNICY</div>
+        <svg class="tw-flame" viewBox="0 0 40 46" xmlns="http://www.w3.org/2000/svg">
+          <path d="M20 2C14 10 8 14 8 24a12 12 0 0 0 24 0c0-6-3-9-5-12 0 5-3 7-5 7 2-6-1-12-2-17z" fill="url(#flameGrad2)" stroke="#7a1e00" stroke-width="1.4"/>
+          <defs>
+            <linearGradient id="flameGrad2" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#fff3b0"/>
+              <stop offset="45%" stop-color="#ffb400"/>
+              <stop offset="100%" stop-color="#ff4d00"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+
+      <div class="tw-list" id="list"></div>
+
+      <div class="tw-footer">
+        <div class="tw-channel"><span class="dot"></span>kick.com/krakowiakv2</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="edit-panel" id="editPanel"></div>
+
+<script>
+  const MAX = 5;
+
+  function readDonators() {
+    const params = new URLSearchParams(location.search);
+    const stored = localStorage.getItem('tw_donators');
+    let list = [];
+
+    let hasUrlData = false;
+    for (let i = 1; i <= MAX; i++) {
+      if (params.has('n' + i)) { hasUrlData = true; break; }
+    }
+
+    if (hasUrlData) {
+      for (let i = 1; i <= MAX; i++) {
+        const n = params.get('n' + i);
+        const a = parseFloat(params.get('a' + i));
+        if (n) list.push({ name: n, amount: isNaN(a) ? 0 : a });
+      }
+      localStorage.setItem('tw_donators', JSON.stringify(list));
+    } else if (stored) {
+      try { list = JSON.parse(stored); } catch (e) { list = []; }
+    }
+
+    list.sort((a, b) => b.amount - a.amount);
+    return list.slice(0, MAX);
+  }
+
+  function renderList(list) {
+    const container = document.getElementById('list');
+    container.innerHTML = '';
+    if (!list.length) {
+      container.innerHTML = '<div class="tw-empty">Brak wpłat — bądź pierwszy!</div>';
+      return;
+    }
+    list.forEach((d, i) => {
+      const rank = i + 1;
+      const row = document.createElement('div');
+      row.className = 'tw-row rank-' + rank;
+      row.innerHTML = `
+        <div class="tw-rank">${rank}</div>
+        <div class="tw-name">${escapeHtml(d.name)}</div>
+        <div class="tw-amount">${d.amount.toLocaleString('pl-PL')} zł</div>`;
+      container.appendChild(row);
+    });
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+  }
+
+  let donators = readDonators();
+  renderList(donators);
+
+  // Tryb edycji: ?edit=1 -> proste pola imie+kwota dla kazdej z 5 osob
+  if (new URLSearchParams(location.search).get('edit') === '1') {
+    const panel = document.getElementById('editPanel');
+    panel.classList.add('show');
+    for (let i = 0; i < MAX; i++) {
+      const row = document.createElement('div');
+      row.className = 'er';
+      const existing = donators[i] || { name: '', amount: '' };
+      row.innerHTML = `
+        <input type="text" placeholder="Imię ${i + 1}" value="${existing.name || ''}">
+        <input type="number" placeholder="Kwota" value="${existing.amount || ''}">`;
+      panel.appendChild(row);
+    }
+    const saveBtn = document.createElement('button');
+    saveBtn.textContent = 'Zapisz';
+    saveBtn.addEventListener('click', () => {
+      const rows = panel.querySelectorAll('.er');
+      const list = [];
+      rows.forEach(r => {
+        const inputs = r.querySelectorAll('input');
+        const name = inputs[0].value.trim();
+        const amount = parseFloat(inputs[1].value);
+        if (name) list.push({ name, amount: isNaN(amount) ? 0 : amount });
+      });
+      localStorage.setItem('tw_donators', JSON.stringify(list));
+      donators = list.sort((a, b) => b.amount - a.amount);
+      renderList(donators);
+    });
+    panel.appendChild(saveBtn);
+  }
+</script>
+</body>
+</html>
