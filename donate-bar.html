@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<title>Pasek Donate - Smocze Kule</title>
+<style>
+  /* ============================================================
+     KONFIGURACJA
+     - Cel (goal) i aktualna kwota (amount) mozna ustawic na 3 sposoby:
+       1) w GOAL_CONFIG ponizej (wartosci startowe),
+       2) w adresie URL: donate-bar.html?goal=500&amount=180
+       3) recznie w przegladarce: donate-bar.html?edit=1 (pokazuje
+          maly panel z polami do wpisania kwoty i celu + przyciskiem Zapisz)
+     Wartosci zapisuja sie w localStorage, wiec zostaja przy kolejnym
+     wczytaniu strony (np. po odswiezeniu w IRL PRO / Streamlabs).
+
+     PODPIECIE TIPPLY (prawdziwe wplaty na zywo):
+     Tipply ma wlasny widget "Cel donate" z gotowym linkiem do OBS,
+     ktory sam aktualizuje kwote z prawdziwych wplat. Ten plik jest
+     wersja NIEZALEZNA (dziala wszedzie, recznie ustawiana kwota) -
+     traktuj go jako zapasowa/prosta opcje. Instrukcja jak zamiast
+     tego "przeskorowac" widget Tipply na styl smoczych kul jest w
+     README.md (Tipply pozwala wkleic wlasny CSS/HTML/JS w edytorze
+     widgetu "Cel donate").
+  ============================================================ */
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: transparent;
+    width: 100%; height: 100%;
+    font-family: 'Arial Black', Arial, sans-serif;
+    overflow: hidden;
+  }
+
+  .db-wrap {
+    width: 900px;
+    margin: 24px auto;
+    position: relative;
+    filter: drop-shadow(0 10px 18px rgba(0,0,0,0.6));
+  }
+
+  .db-aura {
+    position: absolute;
+    inset: -40px -20px -20px;
+    background: radial-gradient(ellipse at 50% 60%, rgba(255,170,30,0.55) 0%, rgba(255,140,0,0.22) 40%, transparent 72%);
+    filter: blur(6px);
+    animation: aura-pulse 3s ease-in-out infinite;
+    z-index: 0;
+    pointer-events: none;
+  }
+  @keyframes aura-pulse {
+    0%, 100% { opacity: 0.7; transform: scale(1); }
+    50%      { opacity: 1; transform: scale(1.03); }
+  }
+
+  .db-balls {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 18px;
+    margin-bottom: -18px;
+    position: relative;
+    z-index: 3;
+  }
+
+  .db-ball {
+    width: 58px;
+    height: 58px;
+    opacity: 0.32;
+    filter: grayscale(0.65) brightness(0.55);
+    transform: scale(0.8);
+    transition: opacity .5s ease, transform .5s cubic-bezier(.34,1.56,.64,1), filter .5s ease;
+  }
+  .db-ball svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .db-ball.lit {
+    opacity: 1;
+    filter: grayscale(0) brightness(1) drop-shadow(0 0 10px rgba(255,170,0,0.9));
+    transform: scale(1.08);
+  }
+
+  .db-bar {
+    position: relative;
+    z-index: 1;
+    background: linear-gradient(180deg, #ffa64d 0%, #ff8a2b 30%, #e8580a 62%, #b33c00 100%);
+    border: 4px solid #3a1600;
+    border-radius: 20px;
+    padding: 26px 28px 16px;
+    box-shadow:
+      inset 0 3px 5px rgba(255,255,255,0.45),
+      inset 0 -10px 16px rgba(0,0,0,0.4),
+      0 0 0 2px rgba(255,200,120,0.25);
+  }
+
+  .db-titles {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+  }
+
+  .db-goal-title {
+    font-size: 32px;
+    font-style: italic;
+    letter-spacing: 1px;
+    background: linear-gradient(180deg, #fff8e0 0%, #ffd558 55%, #ff9f1c 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-stroke: 2px #4a1800;
+    filter: drop-shadow(2px 2px 0 #4a1800) drop-shadow(-2px 2px 0 #4a1800) drop-shadow(0 3px 4px rgba(0,0,0,0.5));
+  }
+
+  .db-amounts {
+    font-family: ui-monospace, Consolas, 'Courier New', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff2cf;
+    text-shadow: 0 2px 3px rgba(0,0,0,0.6);
+  }
+  .db-amounts #current { color: #fff; }
+  .db-amounts .sep { opacity: .7; margin: 0 4px; }
+  .db-amounts #goal-text { color: #ffe08a; }
+
+  .db-track {
+    position: relative;
+    height: 26px;
+    background: #2b1300;
+    border-radius: 13px;
+    box-shadow: inset 0 3px 6px rgba(0,0,0,0.7);
+    overflow: hidden;
+  }
+
+  .db-fill {
+    position: absolute;
+    inset: 0;
+    width: 0%;
+    border-radius: 13px;
+    background: linear-gradient(90deg, #ffdd55, #ff9a1f 60%, #ff6a00);
+    box-shadow: 0 0 12px 2px rgba(255,180,40,0.85);
+    transition: width 1.1s cubic-bezier(.22,.85,.32,1);
+  }
+  .db-fill::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      -45deg, rgba(255,255,255,0.25) 0 10px, transparent 10px 20px);
+    animation: fill-move 1.2s linear infinite;
+  }
+  @keyframes fill-move {
+    from { background-position: 0 0; }
+    to   { background-position: 28px 0; }
+  }
+
+  .db-percent {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: ui-monospace, Consolas, 'Courier New', monospace;
+    font-size: 14px;
+    color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+    letter-spacing: 1px;
+    z-index: 2;
+  }
+
+  .db-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+  }
+
+  .db-caption {
+    font-size: 13px;
+    letter-spacing: 1px;
+    color: #ffe4b3;
+    opacity: 0.9;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+  }
+
+  .db-channel {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #0c0c0c;
+    border: 2px solid #53fc18;
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-size: 14px;
+    color: #53fc18;
+    text-shadow: 0 0 6px rgba(83,252,24,0.6);
+  }
+  .db-channel .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #53fc18;
+    box-shadow: 0 0 6px 2px rgba(83,252,24,0.9);
+    animation: dot-blink 1.4s ease-in-out infinite;
+  }
+  @keyframes dot-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+
+  /* --- Stan po osiagnieciu celu --- */
+  .db-bar.complete {
+    animation: complete-glow 1.6s ease-in-out infinite;
+  }
+  @keyframes complete-glow {
+    0%, 100% { box-shadow: inset 0 2px 4px rgba(255,255,255,0.35), inset 0 -8px 14px rgba(0,0,0,0.35), 0 0 10px 2px rgba(255,220,80,0.5); }
+    50%      { box-shadow: inset 0 2px 4px rgba(255,255,255,0.35), inset 0 -8px 14px rgba(0,0,0,0.35), 0 0 26px 8px rgba(255,220,80,0.95); }
+  }
+
+  /* --- Panel edycji (tylko z ?edit=1) --- */
+  .edit-panel {
+    display: none;
+    width: 900px;
+    margin: 10px auto 0;
+    background: rgba(0,0,0,0.75);
+    border-radius: 10px;
+    padding: 10px 16px;
+    color: #fff;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 13px;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .edit-panel.show { display: flex; }
+  .edit-panel input {
+    width: 80px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: none;
+    font-family: inherit;
+  }
+  .edit-panel button {
+    padding: 5px 14px;
+    border-radius: 6px;
+    border: none;
+    background: #ff8a2b;
+    color: #2b1300;
+    font-family: inherit;
+    font-weight: bold;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+  <div class="db-wrap">
+    <div class="db-aura"></div>
+    <div class="db-balls" id="balls"></div>
+    <div class="db-bar" id="bar">
+      <div class="db-titles">
+        <div class="db-goal-title">CEL: LAPTOP</div>
+        <div class="db-amounts">
+          <span id="current">0 zł</span><span class="sep">/</span><span id="goal-text">500 zł</span>
+        </div>
+      </div>
+      <div class="db-track">
+        <div class="db-fill" id="fill"></div>
+        <div class="db-percent" id="percent-label">0%</div>
+      </div>
+      <div class="db-footer">
+        <div class="db-caption" id="caption">ZBIERAM SMOCZE KULE, WESPRZYJ!</div>
+        <div class="db-channel"><span class="dot"></span>kick.com/krakowiakv2</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="edit-panel" id="editPanel">
+    <label>Kwota (zł):</label>
+    <input type="number" id="editAmount" min="0" step="1">
+    <label>Cel (zł):</label>
+    <input type="number" id="editGoal" min="1" step="1">
+    <button id="editSave">Zapisz</button>
+    <span id="editStatus"></span>
+  </div>
+
+<script>
+  /* ============================================================
+     GOAL_CONFIG — wartosci startowe (nadpisywane przez URL/localStorage)
+  ============================================================ */
+  const GOAL_CONFIG = {
+    goal: 500,
+    amount: 0,
+    ballsCount: 7,
+    amountKey: 'db_donate_current',
+    goalKey: 'db_donate_goal'
+  };
+
+  // Ukladu gwiazdek na kazdej kuli (1-7), wspolrzedne wzgledem srodka 40,40 w viewBoxie 0 0 80 80
+  const STAR_LAYOUTS = {
+    1: [[0, 0]],
+    2: [[-9, -9], [9, 9]],
+    3: [[0, -11], [-10, 8], [10, 8]],
+    4: [[-10, -10], [10, -10], [-10, 10], [10, 10]],
+    5: [[0, -13], [-12, -3], [12, -3], [-7, 12], [7, 12]],
+    6: [[-11, -11], [11, -11], [-14, 0], [14, 0], [-11, 11], [11, 11]],
+    7: [[0, -14], [-11, -8], [11, -8], [-13, 4], [13, 4], [-7, 13], [7, 13]]
+  };
+
+  function starPath(cx, cy, s) {
+    // czteroramienna gwiazdka (jak w Dragon Ballu), s = skala ramienia
+    return `M${cx},${cy - s} C${cx + s * 0.18},${cy - s * 0.22} ${cx + s * 0.22},${cy - s * 0.18} ${cx + s},${cy} ` +
+           `C${cx + s * 0.22},${cy + s * 0.18} ${cx + s * 0.18},${cy + s * 0.22} ${cx},${cy + s} ` +
+           `C${cx - s * 0.18},${cy + s * 0.22} ${cx - s * 0.22},${cy + s * 0.18} ${cx - s},${cy} ` +
+           `C${cx - s * 0.22},${cy - s * 0.18} ${cx - s * 0.18},${cy - s * 0.22} ${cx},${cy - s} Z`;
+  }
+
+  function buildBallSVG(n, idx) {
+    const stars = (STAR_LAYOUTS[n] || STAR_LAYOUTS[1]).map(([dx, dy]) =>
+      `<path d="${starPath(40 + dx, 40 + dy, 5.4)}" fill="#e21f1f" stroke="#7a0000" stroke-width="0.6"/>`
+    ).join('');
+    return `
+      <svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="ballGrad${idx}" cx="35%" cy="30%" r="78%">
+            <stop offset="0%" stop-color="#fffdf0"/>
+            <stop offset="14%" stop-color="#ffe27a"/>
+            <stop offset="34%" stop-color="#ff9f1c"/>
+            <stop offset="62%" stop-color="#f8760a"/>
+            <stop offset="85%" stop-color="#d85400"/>
+            <stop offset="100%" stop-color="#9c3d00"/>
+          </radialGradient>
+          <radialGradient id="ballShade${idx}" cx="68%" cy="78%" r="55%">
+            <stop offset="0%" stop-color="#5a2200" stop-opacity="0.55"/>
+            <stop offset="100%" stop-color="#5a2200" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <circle cx="40" cy="40" r="36" fill="url(#ballGrad${idx})" stroke="#6b3400" stroke-width="1.6"/>
+        <circle cx="40" cy="40" r="36" fill="url(#ballShade${idx})"/>
+        <ellipse cx="26" cy="21" rx="15" ry="9" fill="#ffffff" opacity="0.65"/>
+        <ellipse cx="21" cy="16" rx="5" ry="3" fill="#ffffff" opacity="0.85"/>
+        ${stars}
+      </svg>`;
+  }
+
+  function renderBalls(container) {
+    container.innerHTML = '';
+    for (let i = 1; i <= GOAL_CONFIG.ballsCount; i++) {
+      const wrap = document.createElement('div');
+      wrap.className = 'db-ball';
+      wrap.dataset.n = i;
+      wrap.innerHTML = buildBallSVG(i, i);
+      container.appendChild(wrap);
+    }
+  }
+
+  function readValue(param, storageKey, fallback) {
+    const params = new URLSearchParams(location.search);
+    if (params.has(param)) {
+      const v = parseFloat(params.get(param));
+      if (!isNaN(v)) {
+        localStorage.setItem(storageKey, String(v));
+        return v;
+      }
+    }
+    const stored = localStorage.getItem(storageKey);
+    return stored !== null ? parseFloat(stored) : fallback;
+  }
+
+  function updateDisplay(amount, goal) {
+    amount = Math.max(0, amount);
+    goal = Math.max(1, goal);
+    const percent = Math.min(100, (amount / goal) * 100);
+
+    document.getElementById('current').textContent = amount.toLocaleString('pl-PL') + ' zł';
+    document.getElementById('goal-text').textContent = goal.toLocaleString('pl-PL') + ' zł';
+    document.getElementById('fill').style.width = percent + '%';
+    document.getElementById('percent-label').textContent = Math.round(percent) + '%';
+
+    const step = goal / GOAL_CONFIG.ballsCount;
+    document.querySelectorAll('.db-ball').forEach(ball => {
+      const n = parseInt(ball.dataset.n, 10);
+      ball.classList.toggle('lit', amount >= n * step);
+    });
+
+    const bar = document.getElementById('bar');
+    const caption = document.getElementById('caption');
+    if (percent >= 100) {
+      bar.classList.add('complete');
+      caption.textContent = 'SMOK ZOSTAŁ PRZYWOŁANY! DZIĘKI ZA WSPARCIE!';
+    } else {
+      bar.classList.remove('complete');
+      caption.textContent = 'ZBIERAM SMOCZE KULE, WESPRZYJ!';
+    }
+  }
+
+  renderBalls(document.getElementById('balls'));
+
+  let currentAmount = readValue('amount', GOAL_CONFIG.amountKey, GOAL_CONFIG.amount);
+  let currentGoal = readValue('goal', GOAL_CONFIG.goalKey, GOAL_CONFIG.goal);
+  updateDisplay(currentAmount, currentGoal);
+
+  // Panel edycji: dodaj ?edit=1 do adresu, zeby go pokazac
+  if (new URLSearchParams(location.search).get('edit') === '1') {
+    const panel = document.getElementById('editPanel');
+    panel.classList.add('show');
+    const amountInput = document.getElementById('editAmount');
+    const goalInput = document.getElementById('editGoal');
+    amountInput.value = currentAmount;
+    goalInput.value = currentGoal;
+    document.getElementById('editSave').addEventListener('click', () => {
+      const a = parseFloat(amountInput.value);
+      const g = parseFloat(goalInput.value);
+      if (!isNaN(a)) { currentAmount = a; localStorage.setItem(GOAL_CONFIG.amountKey, String(a)); }
+      if (!isNaN(g) && g > 0) { currentGoal = g; localStorage.setItem(GOAL_CONFIG.goalKey, String(g)); }
+      updateDisplay(currentAmount, currentGoal);
+      document.getElementById('editStatus').textContent = 'Zapisano ✓';
+      setTimeout(() => document.getElementById('editStatus').textContent = '', 1500);
+    });
+  }
+</script>
+</body>
+</html>

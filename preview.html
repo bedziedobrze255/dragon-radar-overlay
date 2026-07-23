@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<title>Podgląd nakładki</title>
+<style>
+  html, body { margin: 0; padding: 0; }
+  body {
+    width: 1280px;
+    height: 720px;
+    background: linear-gradient(160deg, #222 0%, #444 40%, #2c2c2c 100%);
+    position: relative;
+    overflow: hidden;
+    font-family: sans-serif;
+  }
+  .fake-label {
+    position: absolute;
+    top: 20px; left: 20px;
+    color: rgba(255,255,255,0.35);
+    font-size: 14px;
+  }
+  iframe {
+    border: none;
+    position: absolute;
+  }
+  #radar {
+    right: 0;
+    bottom: 90px;
+    width: 340px;
+    height: 380px;
+  }
+  #donate {
+    left: 0;
+    bottom: 0;
+    width: 1280px;
+    height: 160px;
+  }
+</style>
+</head>
+<body>
+  <div class="fake-label">Podgląd — tło symuluje kadr streamu (1280x720)</div>
+  <iframe id="radar" src="dragon-radar.html"></iframe>
+  <iframe id="donate" src="donate-bar.html?amount=180"></iframe>
+</body>
+</html>
