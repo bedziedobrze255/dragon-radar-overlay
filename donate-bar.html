@@ -214,6 +214,11 @@
     opacity: 0.9;
     text-shadow: 0 1px 2px rgba(0,0,0,0.6);
   }
+  .db-live {
+    color: #53fc18;
+    font-weight: bold;
+    animation: dot-blink 1.4s ease-in-out infinite;
+  }
 
   .db-channel {
     display: inline-flex;
@@ -311,7 +316,7 @@
         <div class="db-percent" id="percent-label">0%</div>
       </div>
       <div class="db-footer">
-        <div class="db-caption" id="caption">ZBIERAM SMOCZE KULE, WESPRZYJ!</div>
+        <div class="db-caption" id="caption"><span id="captionText">ZBIERAM SMOCZE KULE, WESPRZYJ!</span><span class="db-live" id="liveTag" style="display:none"> · NA ŻYWO (TIPPLY)</span></div>
         <div class="db-channel"><span class="dot"></span>kick.com/krakowiakv2</div>
       </div>
     </div>
@@ -340,6 +345,19 @@
     amountKey: 'db_donate_current',
     goalKey: 'db_donate_goal',
     titleKey: 'db_donate_title'
+  };
+
+  /* ============================================================
+     TIPPLY — prawdziwe, automatyczne dane z Twojego celu Tipply.
+     Domyslnie wpiety jest Twoj "Cel domyslny" (publiczne, bezpieczne
+     API, ktorego uzywa sam widget Tipply - bez logowania/tokenow).
+     Wylaczenie trybu live: donate-bar.html?tipply=0 (wraca do reczne-
+     go ?amount=/?goal=/?title= albo panelu ?edit=1).
+     Inny cel: donate-bar.html?tipplyGoalId=INNE_ID_CELU
+  ============================================================ */
+  const TIPPLY_CONFIG = {
+    goalId: 'a4051f88-6ee9-4125-95ff-189dde2fc7f5',
+    pollMs: 7000
   };
 
   function readText(param, storageKey, fallback) {
@@ -440,13 +458,13 @@
     });
 
     const bar = document.getElementById('bar');
-    const caption = document.getElementById('caption');
+    const captionText = document.getElementById('captionText');
     if (percent >= 100) {
       bar.classList.add('complete');
-      caption.textContent = 'SMOK ZOSTAŁ PRZYWOŁANY! DZIĘKI ZA WSPARCIE!';
+      captionText.textContent = 'SMOK ZOSTAŁ PRZYWOŁANY! DZIĘKI ZA WSPARCIE!';
     } else {
       bar.classList.remove('complete');
-      caption.textContent = 'ZBIERAM SMOCZE KULE, WESPRZYJ!';
+      captionText.textContent = 'ZBIERAM SMOCZE KULE, WESPRZYJ!';
     }
   }
 
@@ -457,6 +475,36 @@
   let currentTitle = readText('title', GOAL_CONFIG.titleKey, GOAL_CONFIG.title);
   document.getElementById('goalTitle').textContent = 'CEL: ' + currentTitle.toUpperCase();
   updateDisplay(currentAmount, currentGoal);
+
+  // --- Tipply live (automatyczne dane) ---
+  const urlParams = new URLSearchParams(location.search);
+  const tipplyEnabled = urlParams.get('tipply') !== '0';
+  const tipplyGoalId = urlParams.get('tipplyGoalId') || TIPPLY_CONFIG.goalId;
+
+  async function pollTipply() {
+    try {
+      const res = await fetch(`https://tipply.pl/api/widget/goal/${tipplyGoalId}`);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const amount = (data.stats.amount || 0) / 100;
+      const goal = Math.max(1, (data.config.target || 0) / 100);
+      const title = data.config.title || currentTitle;
+
+      currentAmount = amount;
+      currentGoal = goal;
+      currentTitle = title;
+      document.getElementById('goalTitle').textContent = 'CEL: ' + title.toUpperCase();
+      document.getElementById('liveTag').style.display = 'inline';
+      updateDisplay(currentAmount, currentGoal);
+    } catch (e) {
+      console.warn('Tipply: nie udalo sie pobrac danych (uzywam ostatniej znanej wartosci)', e);
+    }
+  }
+
+  if (tipplyGoalId && tipplyEnabled) {
+    pollTipply();
+    setInterval(pollTipply, TIPPLY_CONFIG.pollMs);
+  }
 
   // Panel edycji: dodaj ?edit=1 do adresu, zeby go pokazac
   if (new URLSearchParams(location.search).get('edit') === '1') {

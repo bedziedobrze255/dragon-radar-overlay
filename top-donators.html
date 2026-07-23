@@ -7,9 +7,14 @@
 <style>
   /* ============================================================
      KONFIGURACJA
-     Lista ustawiana przez adres URL: imie + kwota dla max 5 osob
-       top-donators.html?n1=Jan&a1=250&n2=Kasia&a2=180&n3=Michal&a3=90
-     Albo recznie: top-donators.html?edit=1 (panel z polami)
+     Domyslnie ten widget osadza PRAWDZIWY, zywy widget Tipply
+     "Ranking wiadomosci" (LARGEST_DONATES) w ramce w stylu smoczych
+     kul - dane aktualizuja sie same, bez recznego wpisywania.
+
+     Tryb reczny (np. do testow, albo jesli wolisz wpisac wlasna
+     liste): dodaj do adresu imie+kwote dla max 5 osob -
+       top-donators.html?n1=Jan&a1=250&n2=Kasia&a2=180&tipply=0
+     Albo recznie: top-donators.html?edit=1&tipply=0 (panel z polami)
      Najlatwiej wygenerowac link w panel.html (panel sterowania).
   ============================================================ */
   * { box-sizing: border-box; }
@@ -174,6 +179,23 @@
     opacity: 0.85;
   }
 
+  .tw-live-frame {
+    width: 100%;
+    height: 220px;
+    border: 0;
+    background: transparent;
+    display: block;
+  }
+  .tw-live-tag {
+    text-align: center;
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: #53fc18;
+    font-weight: bold;
+    margin-top: 6px;
+    animation: dot-blink 1.4s ease-in-out infinite;
+  }
+
   /* --- Panel edycji (?edit=1) --- */
   .edit-panel {
     display: none;
@@ -244,6 +266,23 @@
 
 <script>
   const MAX = 5;
+  const TIPPLY_ACCOUNT_ID = '1b1f9c34-08dc-48ec-b10c-b731dd7e7428';
+
+  const urlParams = new URLSearchParams(location.search);
+  const tipplyEnabled = urlParams.get('tipply') !== '0';
+  let hasManualUrlData = false;
+  for (let i = 1; i <= MAX; i++) { if (urlParams.has('n' + i)) { hasManualUrlData = true; break; } }
+
+  if (tipplyEnabled && !hasManualUrlData) {
+    // --- Tryb live: osadzamy prawdziwy widget Tipply w naszej ramce ---
+    const list = document.getElementById('list');
+    const accountId = urlParams.get('tipplyAccountId') || TIPPLY_ACCOUNT_ID;
+    list.innerHTML =
+      `<iframe class="tw-live-frame" src="https://widgets.tipply.pl/LARGEST_DONATES/${accountId}/" title="Tipply ranking"></iframe>` +
+      `<div class="tw-live-tag">NA ŻYWO (TIPPLY)</div>`;
+  } else {
+    initManualMode();
+  }
 
   function readDonators() {
     const params = new URLSearchParams(location.search);
@@ -293,38 +332,40 @@
     return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
   }
 
-  let donators = readDonators();
-  renderList(donators);
+  function initManualMode() {
+    let donators = readDonators();
+    renderList(donators);
 
-  // Tryb edycji: ?edit=1 -> proste pola imie+kwota dla kazdej z 5 osob
-  if (new URLSearchParams(location.search).get('edit') === '1') {
-    const panel = document.getElementById('editPanel');
-    panel.classList.add('show');
-    for (let i = 0; i < MAX; i++) {
-      const row = document.createElement('div');
-      row.className = 'er';
-      const existing = donators[i] || { name: '', amount: '' };
-      row.innerHTML = `
-        <input type="text" placeholder="Imię ${i + 1}" value="${existing.name || ''}">
-        <input type="number" placeholder="Kwota" value="${existing.amount || ''}">`;
-      panel.appendChild(row);
-    }
-    const saveBtn = document.createElement('button');
-    saveBtn.textContent = 'Zapisz';
-    saveBtn.addEventListener('click', () => {
-      const rows = panel.querySelectorAll('.er');
-      const list = [];
-      rows.forEach(r => {
-        const inputs = r.querySelectorAll('input');
-        const name = inputs[0].value.trim();
-        const amount = parseFloat(inputs[1].value);
-        if (name) list.push({ name, amount: isNaN(amount) ? 0 : amount });
+    // Tryb edycji: ?edit=1 -> proste pola imie+kwota dla kazdej z 5 osob
+    if (urlParams.get('edit') === '1') {
+      const panel = document.getElementById('editPanel');
+      panel.classList.add('show');
+      for (let i = 0; i < MAX; i++) {
+        const row = document.createElement('div');
+        row.className = 'er';
+        const existing = donators[i] || { name: '', amount: '' };
+        row.innerHTML = `
+          <input type="text" placeholder="Imię ${i + 1}" value="${existing.name || ''}">
+          <input type="number" placeholder="Kwota" value="${existing.amount || ''}">`;
+        panel.appendChild(row);
+      }
+      const saveBtn = document.createElement('button');
+      saveBtn.textContent = 'Zapisz';
+      saveBtn.addEventListener('click', () => {
+        const rows = panel.querySelectorAll('.er');
+        const list = [];
+        rows.forEach(r => {
+          const inputs = r.querySelectorAll('input');
+          const name = inputs[0].value.trim();
+          const amount = parseFloat(inputs[1].value);
+          if (name) list.push({ name, amount: isNaN(amount) ? 0 : amount });
+        });
+        localStorage.setItem('tw_donators', JSON.stringify(list));
+        donators = list.sort((a, b) => b.amount - a.amount);
+        renderList(donators);
       });
-      localStorage.setItem('tw_donators', JSON.stringify(list));
-      donators = list.sort((a, b) => b.amount - a.amount);
-      renderList(donators);
-    });
-    panel.appendChild(saveBtn);
+      panel.appendChild(saveBtn);
+    }
   }
 </script>
 </body>
